@@ -2,9 +2,7 @@
 
 A real-time communication system built with C# .NET server and a web client using WebSocket protocol.
 
-## Project Status
 
-⚠️ **Under Development** - The server-side implementation is currently in progress and not fully complete.
 
 ## Project Structure
 
@@ -53,7 +51,7 @@ websocket/
    dotnet run
    ```
 
-   The server will start on the configured port (see `appsettings.json`).
+   The server will start on the configured port (see `launchSettings.json`) under Properties directory.
 
 ### Web Client
 
@@ -61,11 +59,9 @@ websocket/
 
 2. Connect to the server using the WebSocket connection
 
-## Configuration
+## Project Status
 
-Server configuration can be adjusted in:
-- `server/appsettings.json` - Default settings
-- `server/appsettings.Development.json` - Development-specific settings
+⚠️ **Under Development** - The server-side implementation is currently in progress and not fully complete.
 
 ## Development Notes
 
@@ -80,12 +76,7 @@ Server configuration can be adjusted in:
 - [ ] Add error handling
 - [ ] Implement authentication
 - [ ] Add data persistence
-- [ ] Enhance client UI/UX
 
 ## License
 
-MIT
-
-## Author
-
-ABOUBACAR SOW
+![License](LICENSE.txt)
