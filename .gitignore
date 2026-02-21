@@ -1,0 +1,42 @@
+# C# / .NET
+bin/
+obj/
+*.csproj.user
+*.user
+.vs/
+.vscode/
+packages/
+*.dll
+*.exe
+*.pdb
+
+# Web Client
+node_modules/
+dist/
+build/
+*.min.js
+*.min.css
+
+# Environment & Configuration
+.env
+.env.local
+.env.*.local
+appsettings.*.json
+!appsettings.Development.json
+!appsettings.json
+
+# IDE & Editor
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
