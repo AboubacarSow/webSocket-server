@@ -60,9 +60,9 @@ const handleState = function (state) {
     recipents.disabled = state;
 }
 
-const setConnectionId = (id)=>{
+const setConnectionId = (id) => {
     connIDLabel.innerHTML = `ConnID: ${id}`
-    return ;
+    return;
 }
 
 connectionUrlInput.value = "ws://localhost:5000";
@@ -83,27 +83,32 @@ connectButton.onclick = () => {
     socket.onclose = (event) => {
         updateState();
         let reason;
-        if(!event.reason){
+        if (!event.reason) {
             reason = htmlEscape(event.reason);
-        }else{
+        } else {
             reason = "No reason provided";
         }
-       // const reason = event.reason ? htmlEscape(event.reason) : "No reason provided";
-        commsLog.innerHTML += `<tr> 
-                <td colspan = "3"> Connection Closed: ${htmlEscape(event.code)} 
-                    Reason: ${reason}</td> 
-                </tr>`;
+        // const reason = event.reason ? htmlEscape(event.reason) : "No reason provided";
+        var line = document.createElement("tr");
+        var cell = document.createElement("td");
+ 
+
+        cell.colSpan =5;
+        cell.textContent = `Connection Closed: ${htmlEscape(event.code)} 
+                    Reason: ${reason}`;
+        line.appendChild(cell);
+        commsLog.appendChild(line);
     };
     //close socket
-    
+
     // update on error
     socket.onerror = updateState;
     socket.onmessage = (event) => {
         var content = JSON.parse(event.data);
         console.log(content);
-        if(content.type === 'broadcast'){
+        if (content.type === 'broadcast') {
             var line = document.createElement("tr");
-            var from =document.createElement("td");
+            var from = document.createElement("td");
             var to = document.createElement("td");
             var message = document.createElement("td");
             var date = document.createElement("td");
@@ -124,31 +129,39 @@ connectButton.onclick = () => {
             commsLog.appendChild(line);
             return;
         }
-        if(content.connectionId){
+        if (content.connectionId) {
             setConnectionId(content.connectionId);
             return;
         }
-        commsLog.innerHTML += `<tr> 
-            <td> Server </td> 
-            <td> Client </td> 
-            <td> ${htmlEscape(event.data)} </td> 
-        </tr>`;
+        var line = document.createElement("tr");
+        var cellFrom = document.createElement("td");
+        var cellTo = document.createElement("td");
+        var cellData = document.createElement("td");
+
+        cellData.colSpan =3;
+        cellFrom.textContent = 'Server';
+        cellTo.textContent = 'Client';
+        cellData.textContent =`${htmlEscape(event.data)}`;
+
+        line.appendChild(cell);
+        commsLog.appendChild(line);
+       
 
     }
 
 }
 
-closeButton.onclick = ()=>{
-    if(!socket || socket.readyState !== WebSocket.OPEN){
+closeButton.onclick = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
         alert("Socket not connected");
         return;
     }
     socket.close(1000, "Closing from client");
-    sendMessageInput.value= "";
+    sendMessageInput.value = "";
 }
 
-sendButton.onclick = () =>{
-     if(!socket || socket.readyState !== WebSocket.OPEN){
+sendButton.onclick = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
         alert("Socket not connected");
         return;
     }
@@ -166,5 +179,5 @@ sendButton.onclick = () =>{
     line.appendChild(cell2)
     line.appendChild(cell3)
     commsLog.appendChild(line);
-    
+
 }

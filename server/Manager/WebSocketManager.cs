@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 
 namespace server.Manager;
 
@@ -20,9 +21,9 @@ public class WebSocketServerManager
         Console.WriteLine($"\t Total Connections: {_connections.Count}");
     }
 
-    public async Task RemoveConnectionAsyn(string connectinId)
+    public async Task RemoveConnectionAsyn(string connectionId)
     {
-        if (_connections.TryRemove(connectinId, out var webSocket))
+        if (_connections.TryRemove(connectionId, out var webSocket))
         {
             // improvement 
             try
@@ -32,9 +33,13 @@ public class WebSocketServerManager
                     await webSocket.CloseAsync(closeStatus: WebSocketCloseStatus.NormalClosure,
                                                 statusDescription: "Connection Closed",
                                                 cancellationToken: CancellationToken.None);
+
+                    //Notifying other clients(optional)
+                    var notification = new { type = "user_left", connectionId = connectionId, totalConnections = _connections.Count };
+                    await RoutingMsgAsync(JsonSerializer.Serialize(notification),connectionId);
                     // logging
                     Console.ForegroundColor = ConsoleColor.DarkRed;
-                    Console.WriteLine($"Connection with ID:{connectinId} closed");
+                    Console.WriteLine($"Connection with ID:{connectionId} closed");
                     Console.ResetColor();
                 }
             }
@@ -42,8 +47,11 @@ public class WebSocketServerManager
             {
                 Console.WriteLine($"An error occured {ex.Message}");
             }
-            //Avoiding leak of resources
-            webSocket.Dispose();
+            finally
+            {
+                //Avoiding leak of resources
+                webSocket.Dispose();
+            }
         }
 
 
@@ -69,7 +77,7 @@ public class WebSocketServerManager
         await Task.WhenAll(listOfTask);
     }
 
-    private static async Task SendMsgAsync(WebSocket webSocket, string message)
+    public async Task SendMsgAsync(WebSocket webSocket, string message)
     {
         try
         {

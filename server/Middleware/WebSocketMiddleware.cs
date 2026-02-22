@@ -36,6 +36,9 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
 
         try
         {
+            // Send welcome message
+            var welcomeMessage = new { type = "welcome", message = $"Connection {connectionId} established!" };
+            await manager.SendMsgAsync(socket, JsonSerializer.Serialize(welcomeMessage));
             var result = await socket.ReceiveAsync(buffer: bytes,
                                                    cancellationToken: CancellationToken.None);
             //We loop until nothing is received
@@ -64,10 +67,11 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
                     var payload = JsonSerializer.Serialize(braodcastmsg);
                     await manager.RoutingMsgAsync(payload, connectionId);
                 }
+
                 result = await socket.ReceiveAsync(buffer: bytes,
                                                    cancellationToken: CancellationToken.None);
             }
-            if(socket.State != WebSocketState.Open)
+            if(socket.State != WebSocketState.Open || result.CloseStatus.HasValue)
             {
                 await manager.RemoveConnectionAsyn(connectionId);
                 Console.ForegroundColor = ConsoleColor.Yellow;
