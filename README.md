@@ -1,4 +1,4 @@
-# WebSocket Project
+# ⏱️Building a WebSocket Server from Scratch in .Net 9
 
 A simple real-time communication example: a .NET 9 server that accepts WebSocket connections and a minimal web client for manual testing.
 
@@ -115,3 +115,4 @@ This project was inspired and informed by the following materials:
 ## License
 
 See [LICENSE.txt](LICENSE.txt)
+

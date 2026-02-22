@@ -138,12 +138,14 @@ connectButton.onclick = () => {
         var cellTo = document.createElement("td");
         var cellData = document.createElement("td");
 
-        cellData.colSpan =3;
+        cellData.colSpan = 3;
         cellFrom.textContent = 'Server';
         cellTo.textContent = 'Client';
         cellData.textContent =`${htmlEscape(event.data)}`;
 
-        line.appendChild(cell);
+        line.appendChild(cellFrom);
+        line.appendChild(cellData);
+        line.appendChild(cellTo);
         commsLog.appendChild(line);
        
 
