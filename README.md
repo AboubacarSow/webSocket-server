@@ -68,12 +68,17 @@ By default the app is reachable on the local host URLs used by ASP.NET Core (you
 - On disconnect the server notifies other clients with a `user_left` message: `{ "type": "user_left", "connectionId": "<id>", "totalConnections": N }`.
 - Services and middleware are registered via `ServiceCollectionExtensions.RegisterServices()` and activated with `UseWebSocketServer()`.
 
+- New feature: clients and server now include close-reason support — the client can read the close reason and close status (if present) when a connection is closed. The server can include a close reason when initiating a graceful shutdown.
+- Server-side handling has been simplified: connection handling now runs through the manager interface (e.g. an `IWebSocketManager` implementation). Middleware/handlers should interact with connections via this manager rather than manipulating sockets directly.
+
 ## Message Formats
 
 - Connection ID message (sent immediately after accept): `{ "connectionId": "<id>" }`
 - Welcome message: `{ "type": "welcome", "message": "..." }`
 - Broadcast message: `{ "type": "broadcast", "connectionId": "<id>", "message": "...", "timestamp": "..." }`
 - User left notification: `{ "type": "user_left", "connectionId": "<id>", "totalConnections": N }`
+
+- Note: close events may include a WebSocket close status and an optional close reason string. Clients should inspect the close info to present user-friendly messages or take reconnection decisions.
 
 ## Development Notes
 
