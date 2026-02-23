@@ -82,21 +82,28 @@ connectButton.onclick = () => {
     };
     socket.onclose = (event) => {
         updateState();
-        let reason;
-        if (!event.reason) {
-            reason = htmlEscape(event.reason);
+        if (event.reason) {
+            reason = event.reason;
         } else {
             reason = "No reason provided";
         }
         // const reason = event.reason ? htmlEscape(event.reason) : "No reason provided";
         var line = document.createElement("tr");
-        var cell = document.createElement("td");
- 
-
-        cell.colSpan =5;
-        cell.textContent = `Connection Closed: ${htmlEscape(event.code)} 
+        var from = document.createElement("td");
+        var to = document.createElement("td");
+        var cellMessage = document.createElement("td");
+        var type = document.createElement("td");
+        from.textContent = "Server";
+        to.textContent = "Client";
+        cellMessage.colSpan = 2;
+        cellMessage.textContent = `Connection Closed: ${htmlEscape(event.code)} 
                     Reason: ${reason}`;
-        line.appendChild(cell);
+        type.textContent = `${event.code} and ${event.wasClean? 'clean' : 'not clean'}`;
+
+        line.appendChild(from);
+        line.appendChild(to);
+        line.appendChild(cellMessage);
+        line.appendChild(type);
         commsLog.appendChild(line);
     };
     //close socket
@@ -106,6 +113,48 @@ connectButton.onclick = () => {
     socket.onmessage = (event) => {
         var content = JSON.parse(event.data);
         console.log(content);
+        if(content.type =="user_left"){
+            var line = document.createElement("tr");
+            var from = document.createElement("td");
+            var to = document.createElement("td");
+            var message = document.createElement("td");
+            var type = document.createElement("td");
+
+            from.textContent = "Server";
+            to.textContent = "Client";
+            message.textContent =`User with ID:${content.connectionId} left room`;
+            message.colSpan =2;
+            type.textContent = content.type;
+
+            line.appendChild(from);
+            line.appendChild(to);
+            line.appendChild(message);
+            line.appendChild(type);
+
+            commsLog.appendChild(line);
+            return;
+        }
+        if(content.type=="welcome"){
+            var line = document.createElement("tr");
+            var from = document.createElement("td");
+            var to = document.createElement("td");
+            var message = document.createElement("td");
+            var type = document.createElement("td");
+
+            from.textContent = "Server";
+            to.textContent = "Client";
+            message.textContent = content.message;
+            message.colSpan =2;
+            type.textContent = content.type;
+
+            line.appendChild(from);
+            line.appendChild(to);
+            line.appendChild(message);
+            line.appendChild(type);
+
+            commsLog.appendChild(line);
+            return;
+        }
         if (content.type === 'broadcast') {
             var line = document.createElement("tr");
             var from = document.createElement("td");
@@ -129,7 +178,7 @@ connectButton.onclick = () => {
             commsLog.appendChild(line);
             return;
         }
-        if (content.connectionId) {
+        if (content.type=="connectionNotification") {
             setConnectionId(content.connectionId);
             return;
         }

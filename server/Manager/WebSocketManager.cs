@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using server.Models;
 
 namespace server.Manager;
 
@@ -9,7 +10,7 @@ public interface IWebSocketServerManager
 {
     void AddConnection(string connectionId, WebSocket webSocket);
     int GetConnectionsCount();
-    Task RemoveConnectionAsyn(string connectionId, CancellationToken cancellationToken);
+    Task RemoveConnectionAsyn(string connectionId,ClosingReason reason, CancellationToken cancellationToken);
     Task RoutingMsgAsync(string message, string? senderId, CancellationToken cancellationToken);
     Task SendMsgAsync(WebSocket webSocket, string message, CancellationToken cancellationToken);
 }
@@ -29,31 +30,33 @@ public class WebSocketServerManager : IWebSocketServerManager
         Console.WriteLine($"\t Total Connections: {_connections.Count}");
     }
 
-    public async Task RemoveConnectionAsyn(string connectionId, CancellationToken cancellationToken)
+    public async Task RemoveConnectionAsyn(string connectionId,ClosingReason reason, CancellationToken cancellationToken)
     {
         if (_connections.TryRemove(connectionId, out var webSocket))
         {
             // improvement 
             try
             {
-                if (webSocket.State == WebSocketState.Open)
+                if (webSocket.State == WebSocketState.Open || webSocket.State==WebSocketState.CloseReceived)
                 {
-                    await webSocket.CloseAsync(closeStatus: WebSocketCloseStatus.NormalClosure,
-                                                statusDescription: "Connection Closed",
+                    await webSocket.CloseAsync(closeStatus: reason.ClosingStatus,
+                                                statusDescription: reason.StatusMesssage,
                                                 cancellationToken: CancellationToken.None);
 
                     //Notifying other clients(optional)
                     var notification = new { type = "user_left", connectionId = connectionId, totalConnections = _connections.Count };
                     await RoutingMsgAsync(JsonSerializer.Serialize(notification), connectionId, cancellationToken);
                     // logging
-                    Console.ForegroundColor = ConsoleColor.DarkRed;
+                    Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"Connection with ID:{connectionId} closed");
                     Console.ResetColor();
+                    Console.WriteLine($">> Connections:{_connections.Count}");
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occured {ex.Message}");
+
             }
             finally
             {
@@ -106,4 +109,5 @@ public class WebSocketServerManager : IWebSocketServerManager
 
     public int GetConnectionsCount() => _connections.Count;
 }
+ 
 

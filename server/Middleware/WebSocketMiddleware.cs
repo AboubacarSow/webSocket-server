@@ -1,13 +1,16 @@
 
 using System.Net.WebSockets;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
 using server.Manager;
+using server.Models;
 
 namespace server.Middleware;
 
-public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager) : IMiddleware
+public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager) : IMiddleware
 {
+    private const int MEMORY_BUFFER_SIZE = 1024 *32;
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
         if (!context.WebSockets.IsWebSocketRequest)
@@ -22,7 +25,7 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
             Console.ResetColor();
             Console.WriteLine($">>> Connection ID: {connectionId}");
             //Sending connection Id to client
-            var payload = JsonSerializer.Serialize(new { connectionId });
+            var payload = JsonSerializer.Serialize(new {type="connectionNotification", connectionId });
             await SendConnectionIdAsync(webSocket, payload, context.RequestAborted);
 
             //Handling connection
@@ -31,7 +34,7 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
     }
 
     private static async Task HandleWebSocketServer(string connectionId, WebSocket socket,
-     WebSocketServerManager manager, CancellationToken cancellationToken)
+     IWebSocketServerManager manager, CancellationToken cancellationToken)
     {
         var bytes = new byte[1024 * 4];
 
@@ -51,17 +54,27 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
                     result = await socket.ReceiveAsync(bytes, cancellationToken);
                     if(result.MessageType == WebSocketMessageType.Close)
                     {
-                        await manager.RemoveConnectionAsyn(connectionId,cancellationToken);
+                        await manager.RemoveConnectionAsyn(connectionId,ClosingReason.NormalClient,cancellationToken);
                         return;
                     }
                     if(result.MessageType!= WebSocketMessageType.Text)
                     {
-                        continue;
+                        await manager.RemoveConnectionAsyn(connectionId,
+                                                ClosingReason.InvalidValidMessageType,
+                                                cancellationToken);
+                        return;
                     }
                     memoryBuffer.Write(bytes, 0, result.Count);
+
+                    if(memoryBuffer.Length > MEMORY_BUFFER_SIZE)
+                    {
+                        await manager.RemoveConnectionAsyn(connectionId, ClosingReason.MessageToBig,cancellationToken);
+                        return;
+                    }
                 } while (!result.EndOfMessage);
                 var messageString = Encoding.UTF8.GetString(memoryBuffer.ToArray());
 
+                
                 // Output message to server:
                 Console.ForegroundColor = ConsoleColor.Blue;
                 Console.WriteLine(">>> Message received");
@@ -82,7 +95,7 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
                 await manager.RoutingMsgAsync(payload, connectionId, cancellationToken);
             }
             //We loop until nothing is received
-            await manager.RemoveConnectionAsyn(connectionId, cancellationToken);
+            await manager.RemoveConnectionAsyn(connectionId,ClosingReason.Normal, cancellationToken);
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"Receiving message Closed at connection with ID:{connectionId}");
             Console.WriteLine($">>> Remaining connections: {manager.GetConnectionsCount()}");
@@ -91,7 +104,9 @@ public class WebSocketServerMiddleware(WebSocketServerManager _webSocketManager)
         catch (Exception ex)
         {
             Console.WriteLine($"Something went wrong:{ex.Message}");
-            await manager.RemoveConnectionAsyn(connectionId, cancellationToken);
+            await manager.RemoveConnectionAsyn(connectionId,
+                                ClosingReason.InternalServer,
+                                 cancellationToken);
 
         }
     }
