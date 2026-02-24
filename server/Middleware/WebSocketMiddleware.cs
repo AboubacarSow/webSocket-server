@@ -3,12 +3,15 @@ using System.Net.WebSockets;
 using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
+using server.Data.Entities;
+using server.Data.Repositories;
 using server.Manager;
 using server.Models;
 
 namespace server.Middleware;
 
-public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager) : IMiddleware
+public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager, 
+IMessageRepository messageRepository) : IMiddleware
 {
     private const int MEMORY_BUFFER_SIZE = 1024 *32;
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
@@ -29,12 +32,12 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
             await SendConnectionIdAsync(webSocket, payload, context.RequestAborted);
 
             //Handling connection
-            await HandleWebSocketServer(connectionId, webSocket, _webSocketManager, context.RequestAborted);
+            await HandleWebSocketServer(connectionId, webSocket, _webSocketManager,messageRepository, context.RequestAborted);
         }
     }
 
     private static async Task HandleWebSocketServer(string connectionId, WebSocket socket,
-     IWebSocketServerManager manager, CancellationToken cancellationToken)
+     IWebSocketServerManager manager,IMessageRepository msgRepository, CancellationToken cancellationToken)
     {
         var bytes = new byte[1024 * 4];
 
@@ -74,7 +77,6 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
                 } while (!result.EndOfMessage);
                 var messageString = Encoding.UTF8.GetString(memoryBuffer.ToArray());
 
-                
                 // Output message to server:
                 Console.ForegroundColor = ConsoleColor.Blue;
                 Console.WriteLine(">>> Message received");
@@ -82,15 +84,23 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
 
                 Console.Write(">>> Message : ");
                 Console.WriteLine(messageString);
-
+                var timestamp = DateTime.UtcNow;
                 //Sending message to other clients
                 var braodcastmsg = new
                 {
                     type = "broadcast",
                     connectionId = connectionId,
                     message = messageString,
-                    timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    timestamp = timestamp.ToString("yyyy-MM-dd HH:mm:ss") 
                 };
+                var message = new Message()
+                {
+                    ConnectionId = connectionId,
+                    Sender = "a client",
+                    Content = messageString,
+                    CreatedAt = timestamp
+                };
+                await msgRepository.AddMessageAsync(message, cancellationToken);
                 var payload = JsonSerializer.Serialize(braodcastmsg);
                 await manager.RoutingMsgAsync(payload, connectionId, cancellationToken);
             }
@@ -104,9 +114,9 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
         catch (Exception ex)
         {
             Console.WriteLine($"Something went wrong:{ex.Message}");
-            await manager.RemoveConnectionAsyn(connectionId,
-                                ClosingReason.InternalServer,
-                                 cancellationToken);
+            // await manager.RemoveConnectionAsyn(connectionId,
+            //                     ClosingReason.InternalServer,
+            //                      cancellationToken);
 
         }
     }

@@ -1,3 +1,5 @@
+using server.Data.Persistence;
+using server.Data.Repositories;
 using server.Manager;
 using server.Middleware;
 
@@ -11,6 +13,8 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<WebSocketServerMiddleware>();
         services.AddSingleton<IWebSocketServerManager,WebSocketServerManager >();
+        services.AddSingleton<WebSocketDbContext>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
 
         return services;
     }
