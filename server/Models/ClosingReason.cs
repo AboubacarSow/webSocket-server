@@ -16,5 +16,9 @@ public record ClosingReason(WebSocketCloseStatus ClosingStatus,string StatusMess
     public static ClosingReason MessageToBig =>
     new (WebSocketCloseStatus.MessageTooBig, "Message Payload to big");
 }
+
+public record MessageDto (Guid Id, string ConnectionId,string Sender,string Content);
+
+
  
 

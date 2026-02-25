@@ -4,6 +4,7 @@ using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
 using Npgsql;
+using server.Background.MessageQueue;
 using server.Data.Entities;
 using server.Data.Repositories;
 using server.Manager;
@@ -11,8 +12,8 @@ using server.Models;
 
 namespace server.Middleware;
 
-public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager,
-IMessageRepository messageRepository) : IMiddleware
+public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager,IMessageQueue messageQueue
+) : IMiddleware
 {
     private const int MEMORY_BUFFER_SIZE = 1024 * 32;
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
@@ -30,15 +31,20 @@ IMessageRepository messageRepository) : IMiddleware
             Console.WriteLine($">>> Connection ID: {connectionId}");
             //Sending connection Id to client
             var payload = JsonSerializer.Serialize(new { type = "connectionNotification", connectionId });
-            await SendConnectionIdAsync(webSocket, payload, context.RequestAborted);
+            await SendConnectionIdAsync(webSocket, 
+                                payload, context.RequestAborted);
 
             //Handling connection
-            await HandleWebSocketServer(connectionId, webSocket, _webSocketManager, messageRepository, context.RequestAborted);
+            await HandleWebSocketServer(connectionId, 
+                                        webSocket,
+                                        _webSocketManager,
+                                        messageQueue,
+                                        context.RequestAborted);
         }
     }
 
     private static async Task HandleWebSocketServer(string connectionId, WebSocket socket,
-     IWebSocketServerManager manager, IMessageRepository msgRepository, CancellationToken cancellationToken)
+     IWebSocketServerManager manager, IMessageQueue queue, CancellationToken cancellationToken)
     {
         var bytes = new byte[1024 * 4];
 
@@ -94,14 +100,12 @@ IMessageRepository messageRepository) : IMiddleware
                     message = messageString,
                     timestamp = timestamp
                 };
-                var message = new Message()
-                {
-                    ConnectionId = connectionId,
-                    Sender = "a client",
-                    Content = messageString,
-                    CreatedAt = timestamp
-                };
-                await msgRepository.SaveMsgAsync(message, cancellationToken);
+                //Producing event
+                var eventPayload = new MessageDto(Guid.NewGuid(),connectionId,"a client", messageString); 
+                var messageEvent = new MessageEvent(Guid.NewGuid(),eventPayload,timestamp);
+                await queue.Writer.WriteAsync(messageEvent,cancellationToken);
+
+
                 var payload = JsonSerializer.Serialize(braodcastmsg);
                 await manager.RoutingMsgAsync(payload, connectionId, cancellationToken);
             }
@@ -112,33 +116,7 @@ IMessageRepository messageRepository) : IMiddleware
             Console.WriteLine($">>> Remaining connections: {manager.GetConnectionsCount()}");
             Console.ResetColor();
         }
-        catch (PostgresException pgEx)
-        {
-            Console.WriteLine($"Postgres error: {pgEx.SqlState}");
-
-            switch (pgEx.SqlState)
-            {
-                case "23505": 
-                    Console.WriteLine("uniqueness violation");
-                    break;
-
-                case "23503": 
-                    Console.WriteLine("foreign key violation");
-                    break;
-
-                case "23502":
-                    Console.WriteLine("foreign key violation");
-                    break;
-
-                default:
-                    break;
-            }
-
-        }
-        catch (NpgsqlException npgsqlEx)
-        {
-            Console.WriteLine(npgsqlEx);
-        }
+        
         catch (Exception ex)
         {
             Console.WriteLine($"Something went wrong:{ex.Message}");
