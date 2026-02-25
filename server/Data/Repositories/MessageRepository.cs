@@ -6,7 +6,7 @@ namespace  server.Data.Repositories;
 
 public class MessageRepository(WebSocketDbContext webSocketDbContext) : IMessageRepository
 {
-    public async Task AddMessageAsync(Message message, CancellationToken cancellationToken)
+    public async Task SaveMsgAsync(Message message, CancellationToken cancellationToken)
     {
         var query = @"INSERT INTO Messages (Id, ConnectionId, Sender , Content , CreatedAt)
         VALUES(@Id,@ConnectionId, @Sender,  @Content, @CreatedAt)";

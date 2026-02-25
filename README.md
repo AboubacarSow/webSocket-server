@@ -1,4 +1,4 @@
-# ⏱️Building a WebSocket Server from Scratch in .Net 9
+# ⏱️ Building a WebSocket Server from Scratch in .NET 9
 
 A simple real-time communication example: a .NET 9 server that accepts WebSocket connections and a minimal web client for manual testing.
 
@@ -7,17 +7,18 @@ A simple real-time communication example: a .NET 9 server that accepts WebSocket
 ```
 websocket/
 ├── server/                 # C# .NET server application
-│   ├── Program.cs         # Application entry point
-│   ├── Extensions/        # Service & middleware extension helpers
-│   ├── Manager/           # WebSocket connection manager
-│   ├── Middleware/        # WebSocket middleware
-│   └── Properties/        # Project properties
-├── clients/               # Client applications
-│   └── web-client/        # Web-based client used for manual testing
-│       ├── index.html     # Main HTML
-│       ├── script.js      # Client logic
-│       └── style.css      # Styling
-└── README.md              # This file
+│   ├── Program.cs          # Application entry point
+│   ├── Data/               # Persistence, entities, repositories
+│   ├── Extensions/         # Service & middleware extension helpers
+│   ├── Manager/            # WebSocket connection manager
+│   ├── Middleware/         # WebSocket middleware
+│   └── Properties/         # Project properties
+├── clients/                # Client applications
+│   └── web-client/         # Web-based client used for manual testing
+│       ├── index.html      # Main HTML
+│       ├── script.js       # Client logic
+│       └── style.css       # Styling
+└── README.md               # This file
 ```
 
 ## Technology Stack
@@ -68,8 +69,9 @@ By default the app is reachable on the local host URLs used by ASP.NET Core (you
 - On disconnect the server notifies other clients with a `user_left` message: `{ "type": "user_left", "connectionId": "<id>", "totalConnections": N }`.
 - Services and middleware are registered via `ServiceCollectionExtensions.RegisterServices()` and activated with `UseWebSocketServer()`.
 
-- New feature: clients and server now include close-reason support — the client can read the close reason and close status (if present) when a connection is closed. The server can include a close reason when initiating a graceful shutdown.
-- Server-side handling has been simplified: connection handling now runs through the manager interface (e.g. an `IWebSocketManager` implementation). Middleware/handlers should interact with connections via this manager rather than manipulating sockets directly.
+- Message persistence: incoming messages are now persisted to the database using the repository layer. See key persistence files below (`Message` entity, `WebSocketDbContext`, and `IMessageRepository`/`MessageRepository`). This enables message history and future features such as history-on-connect and replay.
+
+- Close-reason support: clients and server include close reason and close status (if present) when a connection is closed.
 
 ## Message Formats
 
@@ -87,16 +89,32 @@ By default the app is reachable on the local host URLs used by ASP.NET Core (you
   - [server/Middleware/WebSocketMiddleware.cs](server/Middleware/WebSocketMiddleware.cs) — handles accept/receive/close flow.
   - [server/Extensions/ServiceCollectionExtensions.cs](server/Extensions/ServiceCollectionExtensions.cs) — registers middleware and manager.
   - [server/Extensions/WebApplicationExtensions.cs](server/Extensions/WebApplicationExtensions.cs) — adds `UseWebSocketServer()`.
+  - [server/Data/Entities/Message.cs](server/Data/Entities/Message.cs) — message entity persisted to DB.
+  - [server/Data/Persistence/WebSocketDbContext.cs](server/Data/Persistence/WebSocketDbContext.cs) — EF Core DB context.
+  - [server/Data/Repositories/IMessageRepository.cs](server/Data/Repositories/IMessageRepository.cs) and [server/Data/Repositories/MessageRepository.cs](server/Data/Repositories/MessageRepository.cs) — persistence abstraction and implementation.
 
 ## Project Status
 
-- Functional: basic WebSocket connection handling, broadcasting, and graceful disconnects are implemented. Ready for manual testing via the bundled web client.
+- Functional: WebSocket connection handling, broadcasting, graceful disconnects, and basic message persistence are implemented. Manual testing via the bundled web client is supported.
 
-## Future Enhancements
+## Roadmap / Planned Enhancements
 
-- Add authentication/authorization for connections
-- Add persistence (e.g., message history) if needed
-- Add console client as you can see our clients folder is in plural so, we expect to have at least two clients
+The following features are planned to make the server more robust and production-ready:
+
+- **Add message history loading on connect**: Load recent message history for clients when they connect so clients can catch up.
+- **Add message ordering guarantee**: Ensure messages are delivered/processed in a well-defined order (server-side sequence numbers or persisted sequence metadata).
+- **Add retry logic for DB failure**: Implement retries with exponential backoff for transient database failures when persisting messages.
+- **Add backpressure handling**: Detect and apply backpressure when clients or the server are overloaded (pause reads, drop/queue messages, or slow producers).
+- **Move persistence to background queue**: Offload DB writes to a background worker/queue to reduce latency on the WebSocket receive path.
+- **Add rate limiting per connection**: Protect the server from abusive clients by limiting messages per connection (configurable thresholds).
+
+Notes: many of the above items are already scaffolded in the codebase (repository + DbContext). The next implementation steps will be:
+
+1. Surface history-on-connect via the repository and a paged API.
+2. Add a durable background queue for DB writes and integrate retry/backoff logic.
+3. Implement per-connection rate limiting and per-client backpressure strategies.
+
+4. Add authentication/authorization and a simple console client for testing/automation.
 
 ---
 
@@ -120,4 +138,3 @@ This project was inspired and informed by the following materials:
 ## License
 
 See [LICENSE.txt](LICENSE.txt)
-
