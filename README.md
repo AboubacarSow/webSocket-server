@@ -71,6 +71,10 @@ By default the app is reachable on the local host URLs used by ASP.NET Core (you
 
 - Message persistence: incoming messages are now persisted to the database using the repository layer. See key persistence files below (`Message` entity, `WebSocketDbContext`, and `IMessageRepository`/`MessageRepository`). This enables message history and future features such as history-on-connect and replay.
 
+- Background message queue: messages are now asynchronously queued to an in-memory message channel instead of being directly persisted on the WebSocket receive path. This decouples database writes from the WebSocket middleware, improving responsiveness and preventing temporary database failures from disconnecting clients.
+
+- Background persistence job: a hosted background service (`MessageBackgroundJob`) continuously dequeues messages from the message channel and persists them to the database with built-in **linear backoff retry logic** via `RetryHelper`. If a database write fails, the service automatically retries with configurable exponential backoff (default: starting at 1 second, configurable max retries). On repeated failures, messages are logged and eventually dropped after max attempts to prevent infinite loops.
+
 - Close-reason support: clients and server include close reason and close status (if present) when a connection is closed.
 
 ## Message Formats
@@ -86,16 +90,20 @@ By default the app is reachable on the local host URLs used by ASP.NET Core (you
 
 - Key files:
   - [server/Manager/WebSocketManager.cs](server/Manager/WebSocketManager.cs) — manages connections and broadcasting.
-  - [server/Middleware/WebSocketMiddleware.cs](server/Middleware/WebSocketMiddleware.cs) — handles accept/receive/close flow.
-  - [server/Extensions/ServiceCollectionExtensions.cs](server/Extensions/ServiceCollectionExtensions.cs) — registers middleware and manager.
+  - [server/Middleware/WebSocketMiddleware.cs](server/Middleware/WebSocketMiddleware.cs) — handles accept/receive/close flow and enqueues messages to the background queue.
+  - [server/Extensions/ServiceCollectionExtensions.cs](server/Extensions/ServiceCollectionExtensions.cs) — registers middleware, manager, background services, and message queue.
   - [server/Extensions/WebApplicationExtensions.cs](server/Extensions/WebApplicationExtensions.cs) — adds `UseWebSocketServer()`.
   - [server/Data/Entities/Message.cs](server/Data/Entities/Message.cs) — message entity persisted to DB.
   - [server/Data/Persistence/WebSocketDbContext.cs](server/Data/Persistence/WebSocketDbContext.cs) — EF Core DB context.
   - [server/Data/Repositories/IMessageRepository.cs](server/Data/Repositories/IMessageRepository.cs) and [server/Data/Repositories/MessageRepository.cs](server/Data/Repositories/MessageRepository.cs) — persistence abstraction and implementation.
+  - [server/Background/MessageQueue/IMessageQueue.cs](server/Background/MessageQueue/IMessageQueue.cs) and [server/Background/MessageQueue/InMemoryMessageQueue.cs](server/Background/MessageQueue/InMemoryMessageQueue.cs) — in-memory message queue channel.
+  - [server/Background/MessageQueue/MessageEvent.cs](server/Background/MessageQueue/MessageEvent.cs) — message event object passed through the queue.
+  - [server/Background/Job/MessageBackgroundJob.cs](server/Background/Job/MessageBackgroundJob.cs) — hosted background service that persists queued messages with retry logic.
+  - [server/Background/Helpers/RetryHelper.cs](server/Background/Helpers/RetryHelper.cs) — linear backoff retry utility for transient database failures.
 
 ## Project Status
 
-- Functional: WebSocket connection handling, broadcasting, graceful disconnects, and basic message persistence are implemented. Manual testing via the bundled web client is supported.
+- Functional: WebSocket connection handling, broadcasting, graceful disconnects, message persistence via background queue, and retry logic with linear backoff are fully implemented. The background service decouples database writes from the WebSocket middleware, ensuring that temporary database failures do not impact client connections. Manual testing via the bundled web client is supported.
 
 ## Roadmap / Planned Enhancements
 
@@ -103,18 +111,15 @@ The following features are planned to make the server more robust and production
 
 - **Add message history loading on connect**: Load recent message history for clients when they connect so clients can catch up.
 - **Add message ordering guarantee**: Ensure messages are delivered/processed in a well-defined order (server-side sequence numbers or persisted sequence metadata).
-- **Add retry logic for DB failure**: Implement retries with exponential backoff for transient database failures when persisting messages.
 - **Add backpressure handling**: Detect and apply backpressure when clients or the server are overloaded (pause reads, drop/queue messages, or slow producers).
-- **Move persistence to background queue**: Offload DB writes to a background worker/queue to reduce latency on the WebSocket receive path.
+- **Use a durable background queue**: Replace the in-memory message queue with a persistent queue (e.g., RabbitMQ, Kafka, or Azure Service Bus) to ensure messages are not lost on server restarts.
 - **Add rate limiting per connection**: Protect the server from abusive clients by limiting messages per connection (configurable thresholds).
+- **Add authentication/authorization**: Implement JWT tokens or basic auth for secure client connections.
+- **Add a console client**: Build a simple console client for testing/automation and performance benchmarking.
 
-Notes: many of the above items are already scaffolded in the codebase (repository + DbContext). The next implementation steps will be:
-
-1. Surface history-on-connect via the repository and a paged API.
-2. Add a durable background queue for DB writes and integrate retry/backoff logic.
-3. Implement per-connection rate limiting and per-client backpressure strategies.
-
-4. Add authentication/authorization and a simple console client for testing/automation.
+### Completed Features
+- ✅ **Move persistence to background queue** — Messages are now dequeued from an in-memory channel by a background job, decoupling DB writes from the WebSocket middleware.
+- ✅ **Add retry logic for DB failure** — Linear backoff retry strategy implemented via `RetryHelper` for transient database failures when persisting messages.
 
 ---
 
