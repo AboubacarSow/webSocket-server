@@ -1,12 +1,7 @@
-
 using System.Net.WebSockets;
-using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
-using Npgsql;
 using server.Background.MessageQueue;
-using server.Data.Entities;
-using server.Data.Repositories;
 using server.Manager;
 using server.Models;
 
@@ -116,7 +111,11 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
             Console.WriteLine($">>> Remaining connections: {manager.GetConnectionsCount()}");
             Console.ResetColor();
         }
-        
+        catch (OperationCanceledException)
+        {
+             await manager.RemoveConnectionAsyn(connectionId,
+                     ClosingReason.Normal, cancellationToken);
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"Something went wrong:{ex.Message}");
