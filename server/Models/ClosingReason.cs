@@ -15,6 +15,9 @@ public record ClosingReason(WebSocketCloseStatus ClosingStatus,string StatusMess
 
     public static ClosingReason MessageToBig =>
     new (WebSocketCloseStatus.MessageTooBig, "Message Payload to big");
+
+    public static ClosingReason RateLimitExceed => 
+    new (WebSocketCloseStatus.PolicyViolation, "Rate limit per second exceeded");
 }
 
 public record MessageDto (Guid Id, string ConnectionId,string Sender,string Content);

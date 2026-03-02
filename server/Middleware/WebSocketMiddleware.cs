@@ -11,6 +11,7 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
 ) : IMiddleware
 {
     private const int MEMORY_BUFFER_SIZE = 1024 * 32;
+    private const int MAX_RECEIVED_MESSAGE=10;
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
         if (!context.WebSockets.IsWebSocketRequest)
@@ -49,9 +50,10 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
             var welcomeMessage = new { type = "welcome", message = $"Connection {connectionId} established!" };
             await manager.SendMsgAsync(socket, JsonSerializer.Serialize(welcomeMessage), cancellationToken);
 
-
+            int countOfReceivedMessage =0;
             while (socket.State == WebSocketState.Open)
             {
+                var windowStart = DateTime.UtcNow;
                 var memoryBuffer = new MemoryStream();
                 WebSocketReceiveResult result;
                 do
@@ -73,12 +75,26 @@ public class WebSocketServerMiddleware(IWebSocketServerManager _webSocketManager
 
                     if (memoryBuffer.Length > MEMORY_BUFFER_SIZE)
                     {
-                        await manager.RemoveConnectionAsyn(connectionId, ClosingReason.MessageToBig, cancellationToken);
+                        await manager.RemoveConnectionAsyn(connectionId,
+                         ClosingReason.MessageToBig, cancellationToken);
                         return;
                     }
                 } while (!result.EndOfMessage);
                 var messageString = Encoding.UTF8.GetString(memoryBuffer.ToArray());
+                var now = DateTime.UtcNow;
 
+                if((now - windowStart).TotalSeconds >= 1)
+                {
+                    windowStart = now;
+                    countOfReceivedMessage=0;
+                }
+                countOfReceivedMessage++;
+                if(countOfReceivedMessage> MAX_RECEIVED_MESSAGE)
+                {
+                    await manager.RemoveConnectionAsyn(connectionId,
+                    ClosingReason.RateLimitExceed,cancellationToken);
+                    return;
+                }
                 // Output message to server:
                 Console.ForegroundColor = ConsoleColor.Blue;
                 Console.WriteLine(">>> Message received");

@@ -11,10 +11,10 @@ namespace server.Background.Job;
 public class MessageBackgroundJob(IMessageQueue queue, ILogger<MessageBackgroundJob> logger,
  IServiceProvider serviceProvider) : BackgroundService
 {
-    private IMessageQueue _queue = queue;
-    private ILogger<MessageBackgroundJob> _logger = logger;
+    private readonly IMessageQueue _queue = queue;
+    private readonly ILogger<MessageBackgroundJob> _logger = logger;
 
-    private IServiceProvider _serviceProvider =serviceProvider;
+    private readonly IServiceProvider _serviceProvider =serviceProvider;
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (var mevent in _queue.Reader.ReadAllAsync(stoppingToken))

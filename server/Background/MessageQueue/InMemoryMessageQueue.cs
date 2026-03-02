@@ -8,10 +8,11 @@ public class InMemoryMessageQueue : IMessageQueue
 
     public InMemoryMessageQueue()
     {
-        _channel = Channel.CreateUnbounded<MessageEvent>(new UnboundedChannelOptions
+        _channel = Channel.CreateBounded<MessageEvent>(new BoundedChannelOptions(100)
         {
-            SingleReader = false,
-            SingleWriter = false
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true, //we have only one reader : the backgroundwork
+            SingleWriter = false // each connection has its own thread , we do have multiple writer
         });
     }
     public ChannelWriter<MessageEvent> Writer => _channel.Writer;
